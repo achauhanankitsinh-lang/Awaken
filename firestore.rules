@@ -1,0 +1,303 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all reads and writes by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HARDENED PRIMITIVES ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDateString(val) {
+      return val is string && val.size() == 10 && val.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isValidAttributeKey(val) {
+      return val is string && val in ['physical', 'mental', 'learning', 'communication', 'financial', 'career'];
+    }
+
+    function isValidServerTimestampsOnCreate(data) {
+      return data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidServerTimestampsOnUpdate(data) {
+      return data.createdAt == existing().createdAt &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    // --- ENTITY VALIDATION BLUEPRINTS ---
+    function isValidOwnerLock(data) {
+      return data.ownerUid is string &&
+             data.ownerUid.size() >= 1 &&
+             data.ownerUid.size() <= 128 &&
+             data.registrationClosed is bool &&
+             data.registrationClosed == true;
+    }
+
+    function isValidOwnerProfile(data, userId) {
+      return data.ownerId is string &&
+             data.ownerId == userId &&
+             data.ownerId == request.auth.uid &&
+             data.displayName is string &&
+             data.displayName.size() >= 1 &&
+             data.displayName.size() <= 120 &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 200)) &&
+             data.timezone is string &&
+             data.timezone.size() >= 1 &&
+             data.timezone.size() <= 64 &&
+             data.defaultCurrency is string &&
+             data.defaultCurrency == 'INR';
+    }
+
+    function isValidTaskItem(data, userId) {
+      return data.ownerId is string &&
+             data.ownerId == userId &&
+             data.ownerId == request.auth.uid &&
+             isValidAttributeKey(data.attributeKey) &&
+             data.title is string &&
+             data.title.size() >= 1 &&
+             data.title.size() <= 200 &&
+             (!('notes' in data) || data.notes == null || (data.notes is string && data.notes.size() <= 2000)) &&
+             isValidDateString(data.scheduledDate) &&
+             data.status is string &&
+             data.status in ['planned', 'in_progress', 'completed', 'cancelled', 'missed'] &&
+             (!('completedAt' in data) || data.completedAt == null || data.completedAt is timestamp);
+    }
+
+    function isValidActivityLog(data, userId) {
+      return data.ownerId is string &&
+             data.ownerId == userId &&
+             data.ownerId == request.auth.uid &&
+             (!('attributeKey' in data) || data.attributeKey == null || isValidAttributeKey(data.attributeKey)) &&
+             data.title is string &&
+             data.title.size() >= 1 &&
+             data.title.size() <= 200 &&
+             (!('details' in data) || data.details == null || (data.details is string && data.details.size() <= 2000)) &&
+             data.occurredAt is timestamp &&
+             isValidDateString(data.occurredDate) &&
+             (!('metricValue' in data) || data.metricValue == null || (data.metricValue is number && data.metricValue >= 0)) &&
+             (!('metricUnit' in data) || data.metricUnit == null || (data.metricUnit is string && data.metricUnit.size() >= 1 && data.metricUnit.size() <= 40)) &&
+             (!('categoryTag' in data) || data.categoryTag == null || (data.categoryTag is string && data.categoryTag.size() >= 1 && data.categoryTag.size() <= 40));
+    }
+
+    function isValidTrainingDay(data, userId, dateKey) {
+      return data.ownerId is string &&
+             data.ownerId == userId &&
+             data.ownerId == request.auth.uid &&
+             isValidDateString(data.trainingDate) &&
+             data.trainingDate == dateKey &&
+             data.status is string &&
+             data.status in ['planned', 'rest', 'completed', 'missed'];
+    }
+
+    function isValidGoalItem(data, userId) {
+      return data.ownerId is string &&
+             data.ownerId == userId &&
+             data.ownerId == request.auth.uid &&
+             isValidAttributeKey(data.attributeKey) &&
+             data.title is string &&
+             data.title.size() >= 1 &&
+             data.title.size() <= 200 &&
+             (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 2000)) &&
+             (!('targetDate' in data) || data.targetDate == null || isValidDateString(data.targetDate)) &&
+             data.status is string &&
+             data.status in ['active', 'completed', 'cancelled'] &&
+             (!('completedAt' in data) || data.completedAt == null || data.completedAt is timestamp);
+    }
+
+    function isValidFinancialTransaction(data, userId) {
+      return data.ownerId is string &&
+             data.ownerId == userId &&
+             data.ownerId == request.auth.uid &&
+             data.transactionType is string &&
+             data.transactionType in ['income', 'expense'] &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.currency is string &&
+             data.currency == 'INR' &&
+             data.category is string &&
+             data.category.size() >= 1 &&
+             data.category.size() <= 80 &&
+             (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 1000)) &&
+             isValidDateString(data.transactionDate);
+    }
+
+    // --- COLLECTION RULES ---
+
+    // 1. Fixed attributes reference catalog: readable by signed-in users, immutable from client
+    match /attributes/{attributeId} {
+      allow get: if isSignedIn() && isValidId(attributeId);
+      allow list: if isSignedIn();
+      allow create, update, delete: if false;
+    }
+
+    // 2. Single-owner registration lock (no PII stored here)
+    match /app_config/{configId} {
+      allow get: if isSignedIn() && configId == 'owner_lock';
+      allow list: if false;
+      allow create: if isSignedIn() &&
+                       configId == 'owner_lock' &&
+                       incoming().keys().hasAll(['ownerUid', 'registrationClosed', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerUid', 'registrationClosed', 'createdAt', 'updatedAt']) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       isValidOwnerLock(incoming()) &&
+                       isValidServerTimestampsOnCreate(incoming());
+      allow update: if isSignedIn() &&
+                       configId == 'owner_lock' &&
+                       existing().ownerUid == request.auth.uid &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().keys().hasAll(['ownerUid', 'registrationClosed', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerUid', 'registrationClosed', 'createdAt', 'updatedAt']) &&
+                       isValidOwnerLock(incoming()) &&
+                       isValidServerTimestampsOnUpdate(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['registrationClosed', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // 3. Owner-isolated private profile
+    match /users/{userId}/private/{docId} {
+      allow get: if isOwner(userId) && docId == 'profile';
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       docId == 'profile' &&
+                       incoming().keys().hasAll(['ownerId', 'displayName', 'timezone', 'defaultCurrency', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'displayName', 'email', 'timezone', 'defaultCurrency', 'createdAt', 'updatedAt']) &&
+                       isValidOwnerProfile(incoming(), userId) &&
+                       isValidServerTimestampsOnCreate(incoming());
+      allow update: if isOwner(userId) &&
+                       docId == 'profile' &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().keys().hasOnly(['ownerId', 'displayName', 'email', 'timezone', 'defaultCurrency', 'createdAt', 'updatedAt']) &&
+                       isValidOwnerProfile(incoming(), userId) &&
+                       isValidServerTimestampsOnUpdate(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'timezone', 'defaultCurrency', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // 4. Tasks
+    match /users/{userId}/tasks/{taskId} {
+      allow get: if isOwner(userId) && isValidId(taskId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       isValidId(taskId) &&
+                       incoming().keys().hasAll(['ownerId', 'attributeKey', 'title', 'scheduledDate', 'status', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'attributeKey', 'title', 'notes', 'scheduledDate', 'status', 'completedAt', 'createdAt', 'updatedAt']) &&
+                       isValidTaskItem(incoming(), userId) &&
+                       isValidServerTimestampsOnCreate(incoming());
+      allow update: if isOwner(userId) &&
+                       isValidId(taskId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().keys().hasOnly(['ownerId', 'attributeKey', 'title', 'notes', 'scheduledDate', 'status', 'completedAt', 'createdAt', 'updatedAt']) &&
+                       isValidTaskItem(incoming(), userId) &&
+                       isValidServerTimestampsOnUpdate(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['attributeKey', 'title', 'notes', 'scheduledDate', 'status', 'completedAt', 'updatedAt']);
+      allow delete: if isOwner(userId) && isValidId(taskId);
+    }
+
+    // 5. Activity Logs
+    match /users/{userId}/activity_logs/{logId} {
+      allow get: if isOwner(userId) && isValidId(logId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       isValidId(logId) &&
+                       incoming().keys().hasAll(['ownerId', 'title', 'occurredAt', 'occurredDate', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'attributeKey', 'title', 'details', 'occurredAt', 'occurredDate', 'metricValue', 'metricUnit', 'categoryTag', 'createdAt', 'updatedAt']) &&
+                       isValidActivityLog(incoming(), userId) &&
+                       isValidServerTimestampsOnCreate(incoming());
+      allow update: if isOwner(userId) &&
+                       isValidId(logId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().keys().hasOnly(['ownerId', 'attributeKey', 'title', 'details', 'occurredAt', 'occurredDate', 'metricValue', 'metricUnit', 'categoryTag', 'createdAt', 'updatedAt']) &&
+                       isValidActivityLog(incoming(), userId) &&
+                       isValidServerTimestampsOnUpdate(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['attributeKey', 'title', 'details', 'occurredAt', 'occurredDate', 'metricValue', 'metricUnit', 'categoryTag', 'updatedAt']);
+      allow delete: if isOwner(userId) && isValidId(logId);
+    }
+
+    // 6. Training Days (uniqueness enforced by document ID == YYYY-MM-DD)
+    match /users/{userId}/training_days/{dateKey} {
+      allow get: if isOwner(userId) && isValidDateString(dateKey);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       isValidDateString(dateKey) &&
+                       incoming().keys().hasAll(['ownerId', 'trainingDate', 'status', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'trainingDate', 'status', 'createdAt', 'updatedAt']) &&
+                       isValidTrainingDay(incoming(), userId, dateKey) &&
+                       isValidServerTimestampsOnCreate(incoming());
+      allow update: if isOwner(userId) &&
+                       isValidDateString(dateKey) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().trainingDate == existing().trainingDate &&
+                       incoming().keys().hasOnly(['ownerId', 'trainingDate', 'status', 'createdAt', 'updatedAt']) &&
+                       isValidTrainingDay(incoming(), userId, dateKey) &&
+                       isValidServerTimestampsOnUpdate(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isOwner(userId) && isValidDateString(dateKey);
+    }
+
+    // 7. Goals
+    match /users/{userId}/goals/{goalId} {
+      allow get: if isOwner(userId) && isValidId(goalId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       isValidId(goalId) &&
+                       incoming().keys().hasAll(['ownerId', 'attributeKey', 'title', 'status', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'attributeKey', 'title', 'description', 'targetDate', 'status', 'completedAt', 'createdAt', 'updatedAt']) &&
+                       isValidGoalItem(incoming(), userId) &&
+                       isValidServerTimestampsOnCreate(incoming());
+      allow update: if isOwner(userId) &&
+                       isValidId(goalId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().keys().hasOnly(['ownerId', 'attributeKey', 'title', 'description', 'targetDate', 'status', 'completedAt', 'createdAt', 'updatedAt']) &&
+                       isValidGoalItem(incoming(), userId) &&
+                       isValidServerTimestampsOnUpdate(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['attributeKey', 'title', 'description', 'targetDate', 'status', 'completedAt', 'updatedAt']);
+      allow delete: if isOwner(userId) && isValidId(goalId);
+    }
+
+    // 8. Financial Transactions
+    match /users/{userId}/financial_transactions/{txId} {
+      allow get: if isOwner(userId) && isValidId(txId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       isValidId(txId) &&
+                       incoming().keys().hasAll(['ownerId', 'transactionType', 'amount', 'currency', 'category', 'transactionDate', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'transactionType', 'amount', 'currency', 'category', 'description', 'transactionDate', 'createdAt', 'updatedAt']) &&
+                       isValidFinancialTransaction(incoming(), userId) &&
+                       isValidServerTimestampsOnCreate(incoming());
+      allow update: if isOwner(userId) &&
+                       isValidId(txId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().keys().hasOnly(['ownerId', 'transactionType', 'amount', 'currency', 'category', 'description', 'transactionDate', 'createdAt', 'updatedAt']) &&
+                       isValidFinancialTransaction(incoming(), userId) &&
+                       isValidServerTimestampsOnUpdate(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['transactionType', 'amount', 'currency', 'category', 'description', 'transactionDate', 'updatedAt']);
+      allow delete: if isOwner(userId) && isValidId(txId);
+    }
+  }
+}

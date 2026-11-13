@@ -1,0 +1,327 @@
+{
+  "entities": {
+    "Attribute": {
+      "title": "Attribute",
+      "description": "Fixed core development attribute catalog entry.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "enum": ["physical", "mental", "learning", "communication", "financial", "career"],
+          "description": "Unique attribute identifier key."
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the attribute."
+        },
+        "sortOrder": {
+          "type": "integer",
+          "description": "Display sort order 1..6."
+        }
+      },
+      "required": ["key", "name", "sortOrder"]
+    },
+    "OwnerLock": {
+      "title": "OwnerLock",
+      "description": "Single-owner workspace lock disabling public registration after initial owner setup.",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "description": "Authenticated Firebase UID of the single private owner."
+        },
+        "registrationClosed": {
+          "type": "boolean",
+          "description": "Whether public registration is closed."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["ownerUid", "registrationClosed", "createdAt", "updatedAt"]
+    },
+    "OwnerProfile": {
+      "title": "OwnerProfile",
+      "description": "Private owner preferences and profile settings.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "defaultCurrency": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "displayName", "timezone", "defaultCurrency", "createdAt", "updatedAt"]
+    },
+    "TaskItem": {
+      "title": "TaskItem",
+      "description": "Daily or scheduled commitment tied to one of the six attributes.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string"
+        },
+        "attributeKey": {
+          "type": "string",
+          "enum": ["physical", "mental", "learning", "communication", "financial", "career"]
+        },
+        "title": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "scheduledDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "in_progress", "completed", "cancelled", "missed"]
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "attributeKey", "title", "scheduledDate", "status", "createdAt", "updatedAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Individual activity session and optional measurement record.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string"
+        },
+        "attributeKey": {
+          "type": "string",
+          "enum": ["physical", "mental", "learning", "communication", "financial", "career"]
+        },
+        "title": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "occurredDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "metricValue": {
+          "type": "number"
+        },
+        "metricUnit": {
+          "type": "string"
+        },
+        "categoryTag": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "title", "occurredAt", "occurredDate", "createdAt", "updatedAt"]
+    },
+    "TrainingDay": {
+      "title": "TrainingDay",
+      "description": "Single training/rest status per calendar date keyed by YYYY-MM-DD.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string"
+        },
+        "trainingDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "rest", "completed", "missed"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "trainingDate", "status", "createdAt", "updatedAt"]
+    },
+    "GoalItem": {
+      "title": "GoalItem",
+      "description": "Long-term personal goal tied to an attribute without fabricated progress percentages.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string"
+        },
+        "attributeKey": {
+          "type": "string",
+          "enum": ["physical", "mental", "learning", "communication", "financial", "career"]
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "targetDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "completed", "cancelled"]
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "attributeKey", "title", "status", "createdAt", "updatedAt"]
+    },
+    "FinancialTransaction": {
+      "title": "FinancialTransaction",
+      "description": "Actual income or expense transaction in INR.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string"
+        },
+        "transactionType": {
+          "type": "string",
+          "enum": ["income", "expense"]
+        },
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["INR"]
+        },
+        "category": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "transactionDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "transactionType", "amount", "currency", "category", "transactionDate", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/attributes/{attributeId}": {
+      "schema": {
+        "$ref": "#/entities/Attribute"
+      },
+      "description": "Read-only catalog of the six fixed AWAKEN attributes."
+    },
+    "/app_config/{configId}": {
+      "schema": {
+        "$ref": "#/entities/OwnerLock"
+      },
+      "description": "Single-owner workspace registration lock document (owner_lock)."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": {
+        "$ref": "#/entities/OwnerProfile"
+      },
+      "description": "Private owner profile and settings isolated to the owner UID."
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": {
+        "$ref": "#/entities/TaskItem"
+      },
+      "description": "Owner-isolated daily and scheduled commitments."
+    },
+    "/users/{userId}/activity_logs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/ActivityLog"
+      },
+      "description": "Owner-isolated individual activity sessions and measurements."
+    },
+    "/users/{userId}/training_days/{dateKey}": {
+      "schema": {
+        "$ref": "#/entities/TrainingDay"
+      },
+      "description": "Owner-isolated training or rest day status keyed uniquely by YYYY-MM-DD."
+    },
+    "/users/{userId}/goals/{goalId}": {
+      "schema": {
+        "$ref": "#/entities/GoalItem"
+      },
+      "description": "Owner-isolated long-term personal goals."
+    },
+    "/users/{userId}/financial_transactions/{txId}": {
+      "schema": {
+        "$ref": "#/entities/FinancialTransaction"
+      },
+      "description": "Owner-isolated financial income and expense records."
+    }
+  }
+}

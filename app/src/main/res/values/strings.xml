@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">AWAKEN</string>
+    <string name="tagline">Become stronger. Every single day.</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="claim_workspace">Initialize Owner Workspace</string>
+    <string name="workspace_locked_title">Private Workspace Locked</string>
+    <string name="workspace_locked_desc">This AWAKEN workspace is bound to its private owner.</string>
+    <string name="nav_dashboard">Command</string>
+    <string name="nav_attributes">Attributes</string>
+    <string name="nav_tasks">Tasks</string>
+    <string name="nav_activities">Logs</string>
+    <string name="nav_training">Training</string>
+    <string name="nav_goals">Goals</string>
+    <string name="nav_finances">Finances</string>
+    <string name="nav_progress">Progress</string>
+    <string name="nav_coach">Coach</string>
+    <string name="nav_more">System</string>
+    <string name="cd_awaken_emblem">AWAKEN crest emblem</string>
+    <string name="cd_hero_backdrop">AWAKEN command backdrop</string>
+    <string name="quote_line_one">Winners Never Quit</string>
+    <string name="quote_line_connector">and</string>
+    <string name="quote_line_two">Quitters never WIN</string>
+</resources>

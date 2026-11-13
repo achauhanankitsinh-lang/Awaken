@@ -1,0 +1,6 @@
+{
+  "name": "AWAKEN",
+  "description": "Personal development operating system for physical, mental, learning, communication, financial, and career growth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
